@@ -1,0 +1,16 @@
+base
+tidyverse
+ggplot2
+tibble
+tidyr
+readr
+purrr
+dplyr
+stringr
+forcats
+rtweet
+DT
+RMeCab
+RColorBrewer
+wordcloud
+wordcloud2

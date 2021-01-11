@@ -1,0 +1,108 @@
+---
+title: "「コーチング」ツイッター分析"
+author: "本田力也"
+date: "2021/1/11"
+output: 
+  html_document:
+    code_folding: "hide"
+    toc: true
+  　toc_float: true
+  　  smooth_scroll: true
+    
+  
+---
+
+`r lubridate::today()`のツイッターを過去6~7日分遡りを分析した結果は、以下の通りだった。
+コードを確認したい場合、各チャンクの左上に表示されている`code`をクリックするとコードが表示される。
+
+TwitterのAPIの関係で、データを取得するコードをアクセスするたび反映させることができないが、参考までに、コードを載せておく。
+
+```{r, eval=FALSE}
+# import data
+tweets <- search_tweets("コーチング", # ”コーチングでツイートを検索”
+                        n = 10000, # ツイート件数を10,000件に設定
+                        type = "recent", 
+                        include_rts = FALSE, # リツイートを含まない
+                        lang = "ja" # 日本語のみ検索
+)
+
+
+# tidy data  --------------------------------------------------------------
+
+tweets_text <- tweets$text
+
+tweets_text_onlyJa <- str_replace_all(tweets_text, "\\p{ASCII}", "")
+tweets_text_onlyJa_shiftJis = tweets_text_onlyJa %>% iconv(from = "UTF-8", to = "CP932") %>% na.omit()
+
+
+tweets_text_all = ""
+for (i in 1:length((tweets_text_onlyJa_shiftJis))) {
+  tweets_text_all = paste(tweets_text_all, tweets_text_onlyJa_shiftJis[i], sep = "")
+}
+
+write.table(tweets_text_all, "tweets_text_all.txt")
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  collapse = TRUE, 
+  warning = FALSE
+  )
+
+Packages <- c("tidyverse", "rtweet", "stringr","DT", "RMeCab", "wordcloud", "wordcloud2")
+lapply(Packages, library, character.only = TRUE)
+```
+
+## 形態素解析
+```{r import_data, cache=TRUE, warning=FALSE}
+# RMeCab ------------------------------------------------------------------
+docDF_text <- docDF("tweets_text_all.txt", type = 1, pos = c("名詞", "形容詞")) %>% 
+  select(everything(), 
+         word = TERM,
+         freq = starts_with("tweets"))
+
+
+docDF_text2 <- docDF_text %>% 
+  filter(!POS2 %in% c("非自立", "サ変接続", "数")) %>% 
+  arrange(desc(freq))
+```
+
+## 棒グラフ
+```{r}
+# barchart of Freq --------------------------------------------------------
+date <- lubridate::today()
+docDF_text2 %>% 
+  filter(freq > 500) %>% 
+  ggplot(aes(x = reorder(word, freq), y = freq)) +
+  geom_col(aes()) +
+  coord_flip() +
+  labs(title = "コーチングと共にツイートされている単語",
+       subtitle = "",
+       caption = date) +
+  xlab("ツイートされた単語 （降順）") +
+  ylab("度数")
+
+
+```
+
+
+## 一覧表
+```{r}
+datatable(docDF_text2)
+```
+
+## wordcloud
+```{r wordcloud, cache=TRUE, cache.path="cache/", fig.height=5, fig.width=7}
+# wordcloud2 --------------------------------------------------------------
+df <- docDF_text2 %>% 
+  arrange(desc(freq)) %>% 
+  select(word, freq)
+
+wordcloud2(data = df, size = 5, color = "random-dark", 
+           shuffle = FALSE) 
+```
+
+
+
